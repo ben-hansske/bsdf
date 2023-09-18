@@ -1,0 +1,26 @@
+[package]
+name = "bsdf"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["disney", "conductive", "emissive", "lambert", "mix", "rough-glass"]
+ggx = []
+disney = ["ggx"]
+conductive = ["ggx"]
+emissive = []
+lambert = []
+mix = []
+rough-glass = ["ggx"]
+
+[dependencies]
+glam = "0.24.1"
+
+[dev-dependencies]
+fastrand = "2.0.0"
+
+# there are monte carlo test. therefore optimization is required to run the tests in reasonable time
+[profile.test]
+opt-level = 2
