@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Ben Lennart Hanßke"]
 description = "A rust implementation of BSDFs for pathtracing"
+repository = "https://github.com/ben-hansske/bsdf"
+keywords = ["graphics", "rendering", "pathtracing", "raytracing", "materials"]
+categories = ["graphics", "raytracing"]
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -23,6 +26,7 @@ glam = "0.24.1"
 
 [dev-dependencies]
 fastrand = "2.0.0"
+png = "0.17.10"
 
 # there are monte carlo test. therefore optimization is required to run the tests in reasonable time
 [profile.test]

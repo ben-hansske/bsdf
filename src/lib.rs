@@ -45,6 +45,12 @@
 //!
 //! This crate is built on [glam] for a simple but fast vector math library at the core.
 //!
+//! # Examples
+//! The [pathtracer example](https://github.com/ben-hansske/bsdf/blob/main/examples/pathtracer.rs) shows
+//! you how to integrate this crate into a simple forward pathtracer. The code is kept very close to
+//! [Raytracing in a Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
+//! to make it easy to understand.
+//!
 //! # References
 //! A lot of pathtracing literature went into this. Here are the most influential papers and other
 //! sources I have used:

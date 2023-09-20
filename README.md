@@ -11,27 +11,34 @@ or may not change in the future**
 The code is geared towards pathtracing. Direct lighting techniques such as image based lighting or
 polygonal lights are **not implemented**.
 
-Lighting calculations are done exclusively in [f64]s. This is because [BSDF]s can be extremely
-spiky. Using [f64] has helped reducing numerical errors. However, material parameters are
-stored as [f32]s for a minimal memory footprint. All materials can be constructed on the fly,
+Lighting calculations are done exclusively in f64s. This is because BSDFs can be extremely
+spiky. Using f64 has helped reducing numerical errors. However, material parameters are
+stored as f32s for a minimal memory footprint. All materials can be constructed on the fly,
 since they (currently) do not rely on precomputed data. At some point in the future we might
-address this with generic implementations over [f32] and [f64].
+address this with generic implementations over f32 and f64.
 
-[BSDF]s are computed in a local space. That means, the surface is assumed to be the xy-plane
+BSDFs are computed in a local space. That means, the surface is assumed to be the xy-plane
 and the z-vector is assumed to be the normal. Therefore incident and exitant vectors must be
-rotated  before or after evaluation of the [BSDF].
+rotated  before or after evaluation of the BSDF.
 
-The `|omega_i.dot(n)|`, `|cos theta_i|` or `|omega_i.z|` are not part of the [BSDF]. The user is
+The `|omega_i.dot(n)|`, `|cos theta_i|` or `|omega_i.z|` are not part of the BSDF. The user is
 responsible for multiplying them in if necessary (almost always). Pdf's on the other hand,
 are meant for high quality importance sampling. Therefore, they try to take this cosine term
 into account when generating samples.
 
-`sample_...` functions are deterministic. That means you are responsible for generate [f64] in the
+`sample_...` functions are deterministic. That means you are responsible for generate f64 in the
 range of `0.0..1.0`. This allows you to control the sampling process and the random generator
-or low discrepancy sequence in use. These random floats are either passed as a [Vec3d] or
-[Vec2d]
+or low discrepancy sequence in use. These random floats are either passed as a Vec3d or
+Vec2d
 
-This crate is built on [glam] for a simple but fast vector math library at the core.
+This crate is built on [glam](https://crates.io/crates/glam) for a simple but fast vector math library at the core.
+
+# Examples
+The [pathtracer example](https://github.com/ben-hansske/bsdf/blob/main/examples/pathtracer.rs) shows
+you how to integrate this crate into a simple forward pathtracer. The code is kept very close to
+[Raytracing in a Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
+to make it easy to understand.
+
 
 # References
 A lot of pathtracing literature went into this. Here are the most influential papers and other
