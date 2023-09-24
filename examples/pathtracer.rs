@@ -38,9 +38,9 @@ impl Sphere {
         let sqrtd = f64::sqrt(discriminant);
 
         // Find the nearest root that lies in the acceptable range.
-        let root = (-half_b - sqrtd) / a;
+        let mut root = (-half_b - sqrtd) / a;
         if root <= ray_tmin || ray_tmax <= root {
-            let root = (-half_b + sqrtd) / a;
+            root = (-half_b + sqrtd) / a;
             if root <= ray_tmin || ray_tmax <= root {
                 return None;
             }
@@ -137,6 +137,7 @@ impl World {
             WorldHit::Background {
                 // color: RgbD::new(0.7, 0.7, 0.9),
                 color: (1.0 - a) * RgbD::new(1.0, 1.0, 1.0) + a * RgbD::new(0.5, 0.7, 1.0),
+                // color: RgbD::ZERO
             }
         }
     }
@@ -150,7 +151,7 @@ fn random_walk(world: &World, mut ray: Ray, rd: &mut fastrand::Rng) -> RgbD {
     let rr_delta = 0.1;
     #[allow(clippy::never_loop)]
     for depth in 0..50 {
-        match world.find_hit(ray, 1e-5, std::f64::INFINITY) {
+        match world.find_hit(ray, 1e-5, std::f64::MAX) {
             WorldHit::Surface {
                 material,
                 pos,
@@ -172,8 +173,7 @@ fn random_walk(world: &World, mut ray: Ray, rd: &mut fastrand::Rng) -> RgbD {
                 // roussion roulette: always do 5 bounces, after that randomly terminate the path
                 let rr_probab = if depth > 5 {
                     (contrib_factor.length() / rr_delta).clamp(0.0, 1.0)
-                }
-                else {
+                } else {
                     1.0
                 };
                 if rr_probab <= rd.f64() {
@@ -254,9 +254,9 @@ fn main() {
             (0.2, -1.3, 0.2, 0.2),
             Disney {
                 base_color: RgbF::new(1.0, 1.0, 1.0),
-                // transmission: 1.0,
-                ior: 1.1,
-                roughness: 1.0,
+                transmission: 1.0,
+                ior: 1.45,
+                roughness: 0.2,
                 ..Default::default()
             },
         ),
@@ -280,27 +280,30 @@ fn main() {
     let cam_target = Vec3d::new(0.0, 0.0, 0.5);
     let forward = (cam_target - cam_center).normalize();
     let up = Vec3d::Z;
-    let right = forward.cross(up).normalize();
-    let up = right.cross(forward).normalize();
+    // ensures that image is not distorted by image_size.0 and image_size.1 being
+    // different
+    let right = forward.cross(up).normalize() * 2.0 * image_size.0 as f64 / image_size.1 as f64;
+    let up = -right.cross(forward).normalize() * 2.0;
 
     let mut image: Vec<u8> = vec![0; 3 * image_size.0 * image_size.1];
 
-    let focal_length = 1.0;
+    let focal_length = 8.0;
+    let forward = forward * focal_length;
 
     let mut rd = fastrand::Rng::new();
 
-    for x in 0..image_size.0 {
-        for y in 0..image_size.1 {
+    for y in 0..image_size.1 {
+        for x in 0..image_size.0 {
             let mut color = RgbD::ZERO;
             for _ in 0..num_samples {
-                let uv_x = (x as f64 + rd.f64()) / image_size.0 as f64 - 0.5;
-                let uv_y = (y as f64 + rd.f64()) / image_size.1 as f64 - 0.5;
+                // from 0 to 1
+                let uv_x = (x as f64 + rd.f64()) / image_size.0 as f64;
+                let uv_y = (y as f64 + rd.f64()) / image_size.1 as f64;
 
-                // ensures that image is not distorted by image_size.0 and image_size.1 being
-                // different
-                let uv_y = -uv_y * image_size.1 as f64 / image_size.0 as f64;
+                let cam_x = uv_x * 2.0 - 1.0;
+                let cam_y = uv_y * 2.0 - 1.0;
 
-                let direction = (forward * focal_length + right * uv_x + up * uv_y).normalize();
+                let direction = (forward + right * cam_x + up * cam_y).normalize();
 
                 let ray = Ray {
                     origin: cam_center,
@@ -319,6 +322,7 @@ fn main() {
             image[(y * image_size.0 + x) * 3 + 1] = gi;
             image[(y * image_size.0 + x) * 3 + 2] = bi;
         }
+        println!("Row {y} of {} rows finished.", image_size.1);
     }
 
     save_image(
