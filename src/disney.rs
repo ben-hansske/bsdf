@@ -3,7 +3,8 @@
 use crate::{
     ggx::GGX,
     utils::{self, FloatExt, SafeCast, VecExt},
-    RgbD, RgbF, SampleEmissionResponse, SampleIncomingResponse, Vec2d, Vec3d, BSDF,
+    RgbD, RgbF, SampleEmissionResponse, SampleIncomingResponse, SampleOutgoingResponse, Vec2d,
+    Vec3d, BSDF,
 };
 
 const EPS: f32 = 1e-7;
@@ -65,7 +66,7 @@ pub struct Disney {
     /// Physically plausible parameters lie in the range of 1 up to 2. However there are certain
     /// materials where the ior is beyond 2. Physically, this parameter can be understand as
     ///
-    /// ```
+    /// ```none
     ///        speedOfLightAboveTheSurface
     /// ior = -----------------------------
     ///        speetOfLightBelowTheSurface
@@ -569,6 +570,28 @@ impl BSDF for Disney {
     fn base_color(&self, _omega_o: Vec3d) -> RgbD {
         self.base_color.safe_cast() + self.emission.safe_cast()
     }
+
+    fn sample_outgoing(&self, omega_i: Vec3d, rdf: Vec3d) -> SampleOutgoingResponse {
+        assert!(omega_i.is_normalized());
+        let response = self.sample_incoming(omega_i, rdf);
+        let omega_o = response.omega_i;
+        let ior_i = if omega_i.z > 0.0 {
+            1.0
+        } else {
+            self.ior as f64
+        };
+        let ior_o = if omega_o.z > 0.0 {
+            1.0
+        } else {
+            self.ior as f64
+        };
+        SampleOutgoingResponse {
+            omega_o,
+            bsdf: response.bsdf * ior_i.sq() / ior_o.sq(),
+            adjoint_bsdf: response.bsdf,
+            pdf: response.pdf,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -637,6 +660,7 @@ mod tests {
         );
 
         test_utils::test_bsdf_sample_eval(&mat);
+        test_utils::test_bsdf_sample_eval_adjoint(&mat);
         test_utils::test_bsdf_reciprocity_glass(&mat);
     }
 

@@ -81,10 +81,12 @@ where
                 },
             );
             let bsdf = self.b2.evaluate(r.omega_o, omega_i);
+            let adjoint = self.b2.evaluate(omega_i, r.omega_o);
             let pdf = self.b2.sample_outgoing_pdf(r.omega_o, omega_i);
             SampleOutgoingResponse {
                 omega_o: r.omega_o,
                 bsdf: RgbD::lerp(r.bsdf, bsdf, factor),
+                adjoint_bsdf: RgbD::lerp(r.adjoint_bsdf, adjoint, factor),
                 pdf: f64::lerp(r.pdf, pdf, factor),
             }
         } else {
@@ -97,10 +99,12 @@ where
                 },
             );
             let bsdf = self.b1.evaluate(r.omega_o, omega_i);
+            let adjoint = self.b1.evaluate(omega_i, r.omega_o);
             let pdf = self.b1.sample_outgoing_pdf(r.omega_o, omega_i);
             SampleOutgoingResponse {
                 omega_o: r.omega_o,
                 bsdf: RgbD::lerp(bsdf, r.bsdf, factor),
+                adjoint_bsdf: RgbD::lerp(adjoint, r.adjoint_bsdf, factor),
                 pdf: f64::lerp(pdf, r.pdf, factor),
             }
         }

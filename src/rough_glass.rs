@@ -2,7 +2,7 @@
 use crate::{
     ggx::GGX,
     utils::{self, FloatExt},
-    RgbD, SampleIncomingResponse, Vec3d, BSDF,
+    RgbD, SampleIncomingResponse, SampleOutgoingResponse, Vec3d, BSDF,
 };
 
 struct BsdfPdfResult {
@@ -183,6 +183,20 @@ impl BSDF for RoughGlass {
         }
     }
 
+    fn sample_outgoing(&self, omega_i: Vec3d, rdf: Vec3d) -> SampleOutgoingResponse {
+        assert!(omega_i.is_normalized());
+        let response = self.sample_incoming(omega_i, rdf);
+        let omega_o = response.omega_i;
+        let ior_i = if omega_i.z > 0.0 { 1.0 } else { self.ior };
+        let ior_o = if omega_o.z > 0.0 { 1.0 } else { self.ior };
+        SampleOutgoingResponse {
+            omega_o,
+            bsdf: response.bsdf * ior_i.sq() / ior_o.sq(),
+            adjoint_bsdf: response.bsdf,
+            pdf: response.pdf,
+        }
+    }
+
     fn sample_incoming_pdf(&self, omega_o: Vec3d, omega_i: Vec3d) -> f64 {
         self.bsdf_get_pdf(omega_i, omega_o).pdf
     }
@@ -203,44 +217,48 @@ impl crate::core::TransmissiveBsdf for RoughGlass {
 #[allow(clippy::cast_possible_truncation)]
 mod tests {
 
-    use crate::{ggx::GGX, test_utils, utils::FloatExt};
+    use crate::{ggx::GGX, test_utils};
+
+    const SMOOT_RG: RoughGlass = RoughGlass {
+        ior: 1.45,
+        ggx: GGX {
+            alpha_x: 0.05 * 0.05,
+            alpha_y: 0.05 * 0.05,
+        },
+    };
+    const ROUGH_RG: RoughGlass = RoughGlass {
+        ior: 1.45,
+        ggx: GGX {
+            alpha_x: 0.3 * 0.3,
+            alpha_y: 0.4 * 0.4,
+        },
+    };
 
     use super::RoughGlass;
 
     #[test]
-    fn rough_glass() {
-        let mat = RoughGlass {
-            ior: 1.4,
-            ggx: GGX {
-                alpha_x: 0.3.sq(),
-                alpha_y: 0.4.sq(),
-            },
-        };
-        test_utils::test_bsdf_sample_eval(&mat);
-        test_utils::test_bsdf_reciprocity_glass(&mat);
+    fn sample_eval() {
+        test_utils::test_bsdf_sample_eval(&ROUGH_RG);
+        test_utils::test_bsdf_sample_eval_adjoint(&ROUGH_RG);
+    }
+
+    #[test]
+    fn reciprocity() {
+        test_utils::test_bsdf_reciprocity_glass(&ROUGH_RG);
     }
 
     #[test]
     fn pdf_integral() {
-        let mat = RoughGlass {
-            ior: 1.4,
-            ggx: GGX {
-                alpha_x: 0.3.sq(),
-                alpha_y: 0.4.sq(),
-            },
-        };
-        test_utils::test_integrate_inverse_pdf(&mat);
+        test_utils::test_integrate_inverse_pdf(&ROUGH_RG);
     }
 
     #[test]
-    fn energy_conservation() {
-        let mat = RoughGlass {
-            ior: 1.4,
-            ggx: GGX {
-                alpha_x: 0.05.sq(),
-                alpha_y: 0.05.sq(),
-            },
-        };
-        test_utils::test_energy_conservation(&mat, 0.05);
+    fn white_furnace() {
+        test_utils::test_white_furnace(&SMOOT_RG, 0.05);
+    }
+
+    #[test]
+    fn white_furnace_adjoint() {
+        test_utils::test_white_furnace_adjoint(&SMOOT_RG, 0.05);
     }
 }

@@ -1,7 +1,7 @@
 //! [BSDF] that can resemble smooth Diffuse surfaces like plastic
 use std::f64::consts;
 
-use crate::{RgbF, BSDF, Vec3d, SampleIncomingResponse, RgbD, utils::SafeCast};
+use crate::{utils::SafeCast, RgbD, RgbF, SampleIncomingResponse, Vec3d, BSDF};
 
 //TODO move sampling code to utils
 
@@ -13,11 +13,7 @@ pub struct Lambert {
 }
 
 impl BSDF for Lambert {
-    fn sample_incoming(
-        &self,
-        omega_o: Vec3d,
-        rdf: Vec3d,
-    ) -> SampleIncomingResponse {
+    fn sample_incoming(&self, omega_o: Vec3d, rdf: Vec3d) -> SampleIncomingResponse {
         assert!(omega_o.is_normalized());
         let eps_theta_sample = rdf.x.clamp(1e-6, 1.0); // prevent division by zero (division by pdf)
         let cos_theta = eps_theta_sample.sqrt() * omega_o.z.signum();
@@ -60,31 +56,32 @@ impl BSDF for Lambert {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::{RgbF, test_utils};
+    use crate::{test_utils, RgbF};
 
     use super::Lambert;
 
-
+    const LAMBERT_WHITE: Lambert = Lambert { kd: RgbF::ONE };
 
     #[test]
-    fn lambert() {
-        let mat = Lambert { kd: RgbF::ONE };
-        test_utils::test_bsdf_sample_eval(&mat);
-        test_utils::test_bsdf_reciprocity(&mat);
+    fn sample_eval() {
+        test_utils::test_bsdf_sample_eval(&LAMBERT_WHITE);
+        test_utils::test_bsdf_sample_eval_adjoint(&LAMBERT_WHITE);
+    }
+
+    #[test]
+    fn reciprocity() {
+        test_utils::test_bsdf_reciprocity(&LAMBERT_WHITE);
     }
 
     #[test]
     fn pdf_integral() {
-        let mat = Lambert { kd: RgbF::ONE };
-        test_utils::test_integrate_inverse_pdf(&mat);
+        test_utils::test_integrate_inverse_pdf(&LAMBERT_WHITE);
     }
 
     #[test]
     fn energy_conservation() {
-        let mat = Lambert { kd: RgbF::ONE };
-        test_utils::test_energy_conservation(&mat, 0.0);
+        test_utils::test_white_furnace(&LAMBERT_WHITE, 0.0);
     }
 }

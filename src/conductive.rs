@@ -97,51 +97,50 @@ impl BSDF for Conductive {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        ggx::GGX,
-        test_utils,
-        RgbF, utils::FloatExt,
-    };
+    use crate::{ggx::GGX, test_utils, utils::FloatExt, RgbF};
 
     use super::Conductive;
 
+    const CONDUCTIVE_ROUGH: Conductive = Conductive {
+        color: RgbF::ONE,
+        ior: 1.4,
+        ggx: GGX {
+            alpha_x: 0.3 * 0.3,
+            alpha_y: 0.4 * 0.4,
+        },
+    };
+
+    const CONDUCTIVE_SMOOTH: Conductive = Conductive {
+        color: RgbF::ONE,
+        ior: 1.4,
+        ggx: GGX {
+            alpha_x: 0.01 * 0.01,
+            alpha_y: 0.01 * 0.01,
+        },
+    };
+
     #[test]
-    fn conductive() {
-        let mat = Conductive {
-            color: RgbF::ONE,
-            ior: 1.4,
-            ggx: GGX {
-                alpha_x: 0.3,
-                alpha_y: 0.4,
-            },
-        };
-        test_utils::test_bsdf_sample_eval(&mat);
-        test_utils::test_bsdf_reciprocity(&mat);
+    fn sample_eval() {
+        test_utils::test_bsdf_sample_eval(&CONDUCTIVE_ROUGH);
+        test_utils::test_bsdf_sample_eval_adjoint(&CONDUCTIVE_ROUGH);
+    }
+
+    #[test]
+    fn reciprocity() {
+        test_utils::test_bsdf_reciprocity(&CONDUCTIVE_ROUGH);
     }
 
     #[test]
     fn pdf_integral() {
-        let mat = Conductive {
-            color: RgbF::ONE,
-            ior: 1.4,
-            ggx: GGX {
-                alpha_x: 0.3,
-                alpha_y: 0.4,
-            },
-        };
-        test_utils::test_integrate_inverse_pdf(&mat);
+        test_utils::test_integrate_inverse_pdf(&CONDUCTIVE_ROUGH);
     }
 
     #[test]
-    fn energy_conservation() {
-        let mat = Conductive {
-            color: RgbF::ONE,
-            ior: 1.4,
-            ggx: GGX {
-                alpha_x: 0.01.sq(),
-                alpha_y: 0.01.sq(),
-            },
-        };
-        test_utils::test_energy_conservation(&mat, 0.02);
+    fn white_furnace() {
+        test_utils::test_white_furnace(&CONDUCTIVE_SMOOTH, 0.02);
+    }
+    #[test]
+    fn white_furnace_adjoint() {
+        test_utils::test_white_furnace_adjoint(&CONDUCTIVE_SMOOTH, 0.02);
     }
 }

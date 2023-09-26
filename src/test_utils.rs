@@ -68,6 +68,9 @@ macro_rules! assert_in_range {
             $upper
         )
     };
+    ($value:expr, $lower:expr, $upper:expr, $($arg:tt)+) => {
+        assert!($lower <= $value && $value <= $upper, $($arg)*)
+    }
 }
 
 macro_rules! impl_approx_equal {
@@ -130,7 +133,7 @@ macro_rules! impl_approx_equal {
 
 impl_approx_equal!(f64, Vec3d);
 
-use std::f64::consts;
+use std::{f64::consts, thread::panicking};
 
 pub(crate) use assert_eq_approx;
 pub(crate) use assert_eq_approx_abs;
@@ -169,7 +172,7 @@ fn spherical_sample_uv(u: f64, v: f64) -> Vec3d {
 }
 
 #[allow(clippy::cast_lossless)]
-pub fn test_energy_conservation<T: BSDF>(material: &T, allowed_energy_loss: f64) {
+pub fn test_white_furnace_adjoint<T: BSDF>(material: &T, allowed_energy_loss: f64) {
     let mut rd = fastrand::Rng::new();
     let runs = 100;
     let num_samples = 100_000;
@@ -178,13 +181,19 @@ pub fn test_energy_conservation<T: BSDF>(material: &T, allowed_energy_loss: f64)
         let mut sum = RgbD::ZERO;
         let mut sum2 = RgbD::ZERO;
         for _ in 0..num_samples {
-            let SampleOutgoingResponse { omega_o, bsdf, pdf } =
-                material.sample_outgoing(omega_i, rd.vec3d());
+            let SampleOutgoingResponse {
+                omega_o,
+                bsdf: _,
+                pdf,
+                adjoint_bsdf,
+            } = material.sample_outgoing(omega_i, rd.vec3d());
 
-            if bsdf.luminance() > 0.0 {
-                let contrib = bsdf / pdf * omega_o.z.abs();
+            if adjoint_bsdf.luminance() >= 0.0 {
+                let contrib = adjoint_bsdf / pdf * omega_o.z.abs();
                 sum += contrib;
                 sum2 += contrib.sq();
+            } else {
+                panic!()
             }
         }
         sum /= num_samples as f64;
@@ -198,6 +207,14 @@ pub fn test_energy_conservation<T: BSDF>(material: &T, allowed_energy_loss: f64)
         let confidence = (4.0 * std_error).max(1e-3);
 
         assert_in_range!(
+            sum.x,
+            1.0 - confidence - allowed_energy_loss,
+            1.0 + confidence,
+            r"Adjoint White furnace test failed for
+    - omega_i: {omega_i:?}
+    - sum.x: {}
+    - lower_bound: {}
+    - upper_bound: {}",
             sum.x,
             1.0 - confidence - allowed_energy_loss,
             1.0 + confidence
@@ -222,6 +239,125 @@ pub fn test_energy_conservation<T: BSDF>(material: &T, allowed_energy_loss: f64)
         // std_error: {std_error},
         // omega_i: {omega_i:?}"#
         //     );
+    }
+}
+#[allow(clippy::cast_lossless)]
+pub fn test_white_furnace<T: BSDF>(material: &T, allowed_energy_loss: f64) {
+    let mut rd = fastrand::Rng::new();
+    let runs = 100;
+    let num_samples = 100_000;
+    for _i in 0..runs {
+        let omega_o = spherical_sample(&mut rd);
+        let mut sum = RgbD::ZERO;
+        let mut sum2 = RgbD::ZERO;
+        for _ in 0..num_samples {
+            let SampleIncomingResponse {
+                omega_i, bsdf, pdf, ..
+            } = material.sample_incoming(omega_o, rd.vec3d());
+
+            if bsdf.luminance() >= 0.0 {
+                let contrib = bsdf / pdf * omega_i.z.abs();
+                sum += contrib;
+                sum2 += contrib.sq();
+            } else {
+                panic!()
+            }
+        }
+        sum /= num_samples as f64;
+        sum2 /= num_samples as f64;
+
+        let variance =
+            (sum2 - sum.sq()).luminance() * num_samples as f64 / (num_samples - 1) as f64;
+
+        // assert!(variance >= 0.0);
+        let std_error = (variance.abs() / num_samples as f64).sqrt();
+        let confidence = (4.0 * std_error).max(1e-3);
+
+        assert_in_range!(
+            sum.x,
+            1.0 - confidence - allowed_energy_loss,
+            1.0 + confidence,
+            r"White furnace test failed for
+    - omega_o: {omega_o:?}
+    - sum.x: {}
+    - lower_bound: {}
+    - upper_bound: {}",
+            sum.x,
+            1.0 - confidence - allowed_energy_loss,
+            1.0 + confidence
+        );
+        assert_in_range!(
+            sum.y,
+            1.0 - confidence - allowed_energy_loss,
+            1.0 + confidence
+        );
+        assert_in_range!(
+            sum.z,
+            1.0 - confidence - allowed_energy_loss,
+            1.0 + confidence
+        );
+        //     assert_eq_approx_abs!(
+        //         sum,
+        //         RgbD::WHITE,
+        //         Rgb::splat(0.001),
+        //         r#"
+        // sum: {sum:?}
+        // i: {i},
+        // std_error: {std_error},
+        // omega_i: {omega_i:?}"#
+        //     );
+    }
+}
+
+pub fn test_bsdf_sample_eval_adjoint<T: BSDF>(material: &T) {
+    let mut rd = fastrand::Rng::new();
+    // rd.seed(0);
+    let runs = 10000;
+    for _ in 0..runs {
+        let omega_i = spherical_sample(&mut rd);
+        let SampleOutgoingResponse {
+            omega_o,
+            bsdf,
+            adjoint_bsdf,
+            pdf,
+        } = material.sample_outgoing(omega_i, rd.vec3d());
+        let c_bsdf = material.evaluate(omega_o, omega_i);
+        let c_adjoint = material.evaluate(omega_i, omega_o);
+        let c_pdf = material.sample_outgoing_pdf(omega_o, omega_i);
+        assert!(
+            (c_pdf > 0.0 && pdf > 0.0) || bsdf.luminance() == 0.0,
+            r#"
+    PDFs must be greater than 0.
+    pdf: {pdf},
+    c_pdf: {c_pdf},
+    bsdf: {bsdf:?},
+    omega_o: {omega_o:?},
+    omega_i: {omega_i:?}"#
+        );
+        assert_eq_approx!(
+            pdf,
+            c_pdf,
+            0.01,
+            0.003,
+            r#"
+    PDFs must be equal for sample_incoming and sample_incoming_pdf,
+    pdf: {pdf},
+    c_pdf: {c_pdf},
+    omega_o: {omega_o:?},
+    omega_i: {omega_i:?}"#
+        );
+        assert_eq_approx!(bsdf, c_bsdf, RgbD::splat(0.001), RgbD::splat(0.001));
+        assert_eq_approx!(
+            adjoint_bsdf,
+            c_adjoint,
+            RgbD::splat(0.001),
+            RgbD::splat(0.001)
+        );
+
+        assert!(pdf >= 0.0);
+        assert!(bsdf.x >= 0.0);
+        assert!(bsdf.y >= 0.0);
+        assert!(bsdf.z >= 0.0);
     }
 }
 

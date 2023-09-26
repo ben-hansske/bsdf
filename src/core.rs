@@ -14,7 +14,7 @@ pub struct SampleIncomingResponse {
     ///The direction where light could be arriving at the surface
     pub omega_i: Vec3d,
 
-    /// The value at for the BSDF. Indicates how much light is scattered from the incoming
+    /// The value of the BSDF at the given direction. Indicates how much light is scattered from the incoming
     /// direction to the outgoing direction
     pub bsdf: RgbD,
 
@@ -30,9 +30,13 @@ pub struct SampleOutgoingResponse {
     /// The direction to which light is scattered to
     pub omega_o: Vec3d,
 
-    /// The value at for the BSDF. Indicates how much light is scattered from the incoming
+    /// The value of the BSDF at the given direction. Indicates how much light is scattered from the incoming
     /// direction to the outgoing direction
     pub bsdf: RgbD,
+
+    /// The value of the adjoint BSDF at the given direction. Indicates how much light is scattered from the incoming
+    /// direction to the outgoing direction
+    pub adjoint_bsdf: RgbD,
 
     /// The probability distribution for choosing `omega_o` given `omega_i`
     pub pdf: f64,
@@ -77,9 +81,11 @@ pub trait BSDF {
     fn sample_outgoing(&self, omega_i: Vec3d, rdf: Vec3d) -> SampleOutgoingResponse {
         assert!(omega_i.is_normalized());
         let response = self.sample_incoming(omega_i, rdf);
+        // many materials have symmetric brdfs. Therefore, adjoint_bsdf and bsdf are the same
         SampleOutgoingResponse {
             omega_o: response.omega_i,
             bsdf: response.bsdf,
+            adjoint_bsdf: response.bsdf,
             pdf: response.pdf,
         }
     }

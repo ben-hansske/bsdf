@@ -27,6 +27,7 @@ glam = "0.24.1"
 [dev-dependencies]
 fastrand = "2.0.0"
 png = "0.17.10"
+rayon = "1.8.0"
 
 # there are monte carlo test. therefore optimization is required to run the tests in reasonable time
 [profile.test]
