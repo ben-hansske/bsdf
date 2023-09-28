@@ -97,7 +97,7 @@ impl BSDF for Conductive {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ggx::GGX, test_utils, utils::FloatExt, RgbF};
+    use crate::{ggx::GGX, test_utils, RgbF};
 
     use super::Conductive;
 

@@ -133,7 +133,7 @@ macro_rules! impl_approx_equal {
 
 impl_approx_equal!(f64, Vec3d);
 
-use std::{f64::consts, thread::panicking};
+use std::f64::consts;
 
 pub(crate) use assert_eq_approx;
 pub(crate) use assert_eq_approx_abs;
